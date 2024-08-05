@@ -7,7 +7,7 @@ from scipy.interpolate import splev, splrep
 
 from . import lineshapes
 from .lineshapes import (breit_wigner, damped_oscillator, dho, doniach,
-                         expgaussian, exponential, gaussian, gaussian2d,
+                         expgaussian, exponential, gaussian, gaussian2d, gaussian2dWithAngle
                          linear, lognormal, lorentzian, moffat, parabolic,
                          pearson4, pearson7, powerlaw, pvoigt, rectangle, sine,
                          skewed_gaussian, skewed_voigt, split_lorentzian, step,
@@ -594,6 +594,68 @@ class Gaussian2dModel(Model):
 #                + "*max({tiny}, {prefix:s}sigmay))")
 #         expr = fmt.format(tiny=tiny, factor=self.height_factor, prefix=prefix)
 #         addpar(f'{prefix}height', expr=expr)
+
+    def guess(self, data, x, y, negative=False, **kwargs):
+        """Estimate initial model parameter values from data."""
+        pars = guess_from_peak2d(self, data, x, y, negative)
+        return update_param_vals(pars, self.prefix, **kwargs)
+
+    __init__.__doc__ = COMMON_INIT_DOC.replace("['x']", "['x', 'y']")
+    guess.__doc__ = COMMON_GUESS_DOC
+
+
+
+class Gaussian2dWithAngleModel(Model):
+    r"""A model based on a two-dimensional Gaussian function.
+
+    In constrast to the 'normal' Gaussian2D model, this model also
+    allows for tilted Gaussians, by containing a rotation angle 
+    `theta`.
+
+    The model has two independent variables `x` and `y` and six
+    Parameters: `amplitude`, `centerx`, `sigmax`, `centery`, `sigmay`,
+    and `theta`.
+    In addition, parameters `fwhmx`, `fwhmy`, and `height` are included as
+    constraints to report the maximum peak height and the two full width
+    at half maxima, respectively.
+
+    .. math::
+
+
+        f(x, y; A, \mu_x, \sigma_x, \mu_y, \sigma_y, \theta) =
+        A * \exp\left(exp(-a*(x-\mu_x)^2 - b (x-centerx) (y-\mu_y)
+        - c* y-\mu_y)^2) \right)
+
+    with the following definitions
+
+    .. math::
+
+        a = (\cos(theta)^2/(2 \sigma_x^2) + \sin(theta)^2/(2 \sigma_y^2))
+        b = (\sin(2 theta)/(2 \sigma_x^2) - \sin(2 theta)/(2 \sigma_y^2))
+        c = (\sin(theta)^2/(2 \sigma_x^2) + \cos(theta)^2/(2 \sigma_y^2))
+
+    """
+
+    fwhm_factor = 2*np.sqrt(2*np.log(2))
+    height_factor = 1./(2*np.pi)
+
+    def __init__(self, independent_vars=['x', 'y'], prefix='', nan_policy='raise',
+                 **kwargs):
+        kwargs.update({'prefix': prefix, 'nan_policy': nan_policy,
+                       'independent_vars': independent_vars})
+        super().__init__(gaussian2dWithAngle, **kwargs)
+        self._set_paramhints_prefix()
+
+    def _set_paramhints_prefix(self):
+        self.set_param_hint('sigmax', min=0)
+        self.set_param_hint('sigmay', min=0)
+        expr = fwhm_expr(self)
+        self.set_param_hint('fwhmx', expr=expr.replace('sigma', 'sigmax'))
+        self.set_param_hint('fwhmy', expr=expr.replace('sigma', 'sigmay'))
+        fmt = ("{factor:.7f}*{prefix:s}amplitude/(max({tiny}, {prefix:s}sigmax)"
+               + "*max({tiny}, {prefix:s}sigmay))")
+        expr = fmt.format(tiny=tiny, factor=self.height_factor, prefix=self.prefix)
+        self.set_param_hint('height', expr=expr)
 
     def guess(self, data, x, y, negative=False, **kwargs):
         """Estimate initial model parameter values from data."""
