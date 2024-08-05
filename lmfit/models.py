@@ -7,7 +7,7 @@ from scipy.interpolate import splev, splrep
 
 from . import lineshapes
 from .lineshapes import (breit_wigner, damped_oscillator, dho, doniach,
-                         expgaussian, exponential, gaussian, gaussian2d, gaussian2dWithAngle
+                         expgaussian, exponential, gaussian, gaussian2d, gaussian2dWithAngle,
                          linear, lognormal, lorentzian, moffat, parabolic,
                          pearson4, pearson7, powerlaw, pvoigt, rectangle, sine,
                          skewed_gaussian, skewed_voigt, split_lorentzian, step,
