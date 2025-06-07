@@ -39,8 +39,7 @@ def assert_parameter_attributes(par, expected):
 def test_check_ast_errors():
     """Assert that an exception is raised upon AST errors."""
     pars = lmfit.Parameters()
-
-    msg = r"at expr='<_?ast.Module object at"
+    msg = "name 'par2' is not defined"
     with pytest.raises(NameError, match=msg):
         pars.add('par1', expr='2.0*par2')
 
@@ -227,7 +226,7 @@ def test_parameters__array__(parameters):
     """Test the __array__ magic method."""
     pars, _, _ = parameters
 
-    assert_allclose(np.array(pars), np.array([10.0, 20.0]))
+    assert_allclose(np.asarray(pars), np.asarray([10.0, 20.0]))
 
 
 def test_parameters__reduce__(parameters):
@@ -633,3 +632,33 @@ def test_unset_constrained_param():
     assert out2.chisqr < out1.chisqr
     assert out2.rsquared > out1.rsquared
     assert out2.params['gamma'].correl['sigma'] < -0.6
+
+
+def test_parameters_add_variants():
+    """
+    setting vairiations for Parameters.add()
+    """
+    pars = lmfit.Parameters()
+    par1 = lmfit.Parameter('a', value=3, min=0)
+    pars.add(par1)
+
+    par2 = lmfit.Parameter('b', value=7, min=1)
+    pars.add('bprime', par2)
+
+    par3 = lmfit.Parameter('c', value=9, user_data={'form': 'square'})
+    pars.add('c', par3)
+    pars.add('c1', par3, min=1)
+
+    assert pars['a'].value == 3
+
+    assert pars['bprime'].value == 7
+    assert pars['bprime'].min == 1
+    assert pars['bprime'].name == 'bprime'
+
+    assert pars['c'].value == 9
+    assert pars['c'].user_data == {'form': 'square'}
+    assert pars['c1'].value == 9
+
+    assert pars['c1'].min == 1
+    assert pars['c1'].user_data == {'form': 'square'}
+    assert (pars['c1'] is not pars['c'])

@@ -529,16 +529,20 @@ class Model:
             for fnam, fpar in sig.parameters.items():
                 if fpar.kind == fpar.VAR_KEYWORD:
                     keywords_ = fnam
-                elif fpar.kind in (fpar.POSITIONAL_ONLY, fpar.POSITIONAL_OR_KEYWORD):
+                elif fpar.kind in (fpar.KEYWORD_ONLY,
+                                   fpar.POSITIONAL_OR_KEYWORD):
                     default_vals[fnam] = fpar.default
                     if (isinstance(fpar.default, (float, int, complex))
                        and not isinstance(fpar.default, bool)):
                         kw_args[fnam] = fpar.default
+                        pos_args.append(fnam)
                     elif fpar.default == fpar.empty:
                         pos_args.append(fnam)
                     else:
                         kw_args[fnam] = fpar.default
                         indep_vars.append(fnam)
+                elif fpar.kind == fpar.POSITIONAL_ONLY:
+                    raise ValueError("positional only arguments with '/' are not supported")
                 elif fpar.kind == fpar.VAR_POSITIONAL:
                     raise ValueError(f"varargs '*{fnam}' is not supported")
         # inspection done
@@ -877,7 +881,7 @@ class Model:
                    'this, using "nan_policy=\'omit\'" will probably not work.')
             raise ValueError(msg)
 
-        diff = model - data
+        diff = data - model
 
         if diff.dtype is complex:
             # data/model are complex
@@ -2319,7 +2323,7 @@ class ModelResult(Minimizer):
         if yerr is None and self.weights is not None:
             yerr = 1.0/self.weights
 
-        residuals = reduce_complex(self.eval()) - reduce_complex(self.data)
+        residuals = reduce_complex(self.data) - reduce_complex(self.eval())
         if yerr is not None:
             ax.errorbar(x_array, residuals,
                         yerr=propagate_err(self.data, yerr, parse_complex),

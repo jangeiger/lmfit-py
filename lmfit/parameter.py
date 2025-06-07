@@ -2,6 +2,7 @@
 
 from copy import deepcopy
 import json
+import warnings
 
 from asteval import Interpreter, get_ast_names, valid_symbol_name
 from numpy import arcsin, array, cos, inf, isclose, sin, sqrt
@@ -25,6 +26,20 @@ def check_ast_errors(expr_eval):
     """Check for errors derived from asteval."""
     if len(expr_eval.error) > 0:
         expr_eval.raise_exception(None)
+
+
+class Writer:
+    """Replace 'stdout' and 'stderr' for asteval."""
+    def __init__(self, **kws):
+        self.messages = []
+        for k, v in kws.items():
+            setattr(self, k, v)
+
+    def write(self, msg):
+        """Internal writer."""
+        o = msg.strip()
+        if len(o) > 0:
+            self.messages.append(msg)
 
 
 def asteval_with_uncertainties(*vals, obj=None, pars=None, names=None, **kwargs):
@@ -76,8 +91,9 @@ class Parameters(dict):
 
         """
         super().__init__(self)
-
-        self._asteval = Interpreter()
+        self._ast_msgs = Writer()
+        self._asteval = Interpreter(writer=self._ast_msgs,
+                                    err_writer=self._ast_msgs)
 
         _syms = {}
         _syms.update(SCIPY_FUNCTIONS)
@@ -85,6 +101,9 @@ class Parameters(dict):
             _syms.update(usersyms)
         for key, val in _syms.items():
             self._asteval.symtable[key] = val
+
+    def _writer(self, msg):
+        self._asteval_msgs.append(msg)
 
     def copy(self):
         """Parameters.copy() should always be a deepcopy."""
@@ -386,8 +405,8 @@ class Parameters(dict):
                 val['is_init_value'] = True
             par.set(**val)
 
-    def add(self, name, value=None, vary=True, min=-inf, max=inf, expr=None,
-            brute_step=None):
+    def add(self, name, value=None, vary=None, min=-inf, max=inf, expr=None,
+            brute_step=None, user_data=None):
         """Add a Parameter.
 
         Parameters
@@ -428,11 +447,46 @@ class Parameters(dict):
 
         """
         if isinstance(name, Parameter):
+            if name.value is None:
+                name.value = value
+            if name.expr is None:
+                name.expr = expr
+            if name.min in (None, -inf):
+                name.min = min
+            if name.max in (None, inf):
+                name.max = max
+            if name.brute_step is None:
+                name.brute_step = brute_step
+            if name.user_data is None:
+                name.user_data = user_data
+            if vary is not None:
+                name.vary = vary
             self.__setitem__(name.name, name)
+        elif isinstance(value, Parameter):
+            value = deepcopy(value)
+            value.name = name
+            if value.expr is None:
+                value.expr = expr
+            if value.min in (None, -inf):
+                value.min = min
+            if value.max in (None, inf):
+                value.max = max
+            if value.brute_step is None:
+                value.brute_step = brute_step
+            if value.user_data is None:
+                value.user_data = user_data
+            if vary is not None:
+                value.vary = vary
+            self.__setitem__(name, value)
         else:
+            if vary is None:
+                vary = True
             self.__setitem__(name, Parameter(value=value, name=name, vary=vary,
                                              min=min, max=max, expr=expr,
-                                             brute_step=brute_step))
+                                             brute_step=brute_step, user_data=user_data))
+        if len(self._asteval.error) > 0:
+            err = self._asteval.error[0]
+            raise err.exc(err.msg)
 
     def add_many(self, *parlist):
         """Add many parameters, using a sequence of tuples.
@@ -515,9 +569,17 @@ class Parameters(dict):
                 vindex += 1
                 vnames.append(par.name)
                 vbest.append(par.value)
-                if getattr(par, 'sdterr', None) is None and covar is not None:
+                if getattr(par, 'stderr', None) is None and covar is not None:
                     par.stderr = sqrt(covar[vindex, vindex])
-            uvars[par.name] = ufloat(par.value, getattr(par, 'sdterr', 0.0))
+            stderr = getattr(par, 'stderr', 0.0)
+            if stderr is None:
+                stderr = 0.00
+            if stderr < tiny*max(tiny, abs(par.value)):
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    uvars[par.name] = ufloat(par.value, stderr)
+            else:
+                uvars[par.name] = ufloat(par.value, stderr)
 
         corr_uvars = None
         if covar is not None:

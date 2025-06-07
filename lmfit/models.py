@@ -363,7 +363,7 @@ class SplineModel(Model):
 
     """
 
-    MAX_KNOTS = 300
+    MAX_KNOTS = 100
     NKNOTS_MAX_ERR = f"SplineModel supports up to {MAX_KNOTS:d} knots"
     NKNOTS_NDARRY_ERR = "SplineModel xknots must be 1-D array-like"
     DIM_ERR = "SplineModel supports only 1-d spline interpolation"
@@ -391,9 +391,37 @@ class SplineModel(Model):
         self.nknots = len(xknots)
         self.order = 3   # cubic splines only
 
-        def spline_model(x, s0=1, s1=1, s2=1, s3=1, s4=1, s5=1):
-            "used only for the initial parsing"
-            return x
+        def spline_model(x, s0=1, s1=1, s2=1, s3=1, s4=1, s5=1, s6=1, s7=1,
+                         s8=1, s9=1, s10=1, s11=1, s12=1, s13=1, s14=1, s15=1,
+                         s16=1, s17=1, s18=1, s19=1, s20=1, s21=1, s22=1, s23=1,
+                         s24=1, s25=1, s26=1, s27=1, s28=1, s29=1, s30=1, s31=1,
+                         s32=1, s33=1, s34=1, s35=1, s36=1, s37=1, s38=1, s39=1,
+                         s40=1, s41=1, s42=1, s43=1, s44=1, s45=1, s46=1, s47=1,
+                         s48=1, s49=1, s50=1, s51=1, s52=1, s53=1, s54=1, s55=1,
+                         s56=1, s57=1, s58=1, s59=1, s60=1, s61=1, s62=1, s63=1,
+                         s64=1, s65=1, s66=1, s67=1, s68=1, s69=1, s70=1, s71=1,
+                         s72=1, s73=1, s74=1, s75=1, s76=1, s77=1, s78=1, s79=1,
+                         s80=1, s81=1, s82=1, s83=1, s84=1, s85=1, s86=1, s87=1,
+                         s88=1, s89=1, s90=1, s91=1, s92=1, s93=1, s94=1, s95=1,
+                         s96=1, s97=1, s98=1, s99=1, knots=None, order=None):
+            """spline evaluation"""
+            coefs = [s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11,
+                     s12, s13, s14, s15, s16, s17, s18, s19, s20, s21,
+                     s22, s23, s24, s25, s26, s27, s28, s29, s30, s31,
+                     s32, s33, s34, s35, s36, s37, s38, s39, s40, s41,
+                     s42, s43, s44, s45, s46, s47, s48, s49, s50, s51,
+                     s52, s53, s54, s55, s56, s57, s58, s59, s60, s61,
+                     s62, s63, s64, s65, s66, s67, s68, s69, s70, s71,
+                     s72, s73, s74, s75, s76, s77, s78, s79, s80, s81,
+                     s82, s83, s84, s85, s86, s87, s88, s89, s90, s91,
+                     s92, s93, s94, s95, s96, s97, s98, s99]
+            if knots is None:
+                knots = self.knots
+            if order is None:
+                order = self.order
+            coefs = coefs[:len(knots)]
+            coefs.extend([coefs[-1]]*(order+1))
+            return splev(x, [knots, np.array(coefs), order])
 
         super().__init__(spline_model, **kwargs)
 
@@ -402,21 +430,7 @@ class SplineModel(Model):
 
         self._param_root_names = [f's{d}' for d in range(self.nknots)]
         self._param_names = [f'{prefix}{s}' for s in self._param_root_names]
-
-        self.knots, _c, _k = splrep(self.xknots, np.ones(self.nknots),
-                                    k=self.order)
-
-    def eval(self, params=None, **kwargs):
-        """note that we override `eval()` here for a variadic function,
-        as we will not know  the number of spline parameters until run time
-        """
-        self.make_funcargs(params, kwargs)
-
-        coefs = [params[f'{self.prefix}s{d}'].value for d in range(self.nknots)]
-        coefs.extend([coefs[-1]]*(self.order+1))
-        coefs = np.array(coefs)
-        x = kwargs[self.independent_vars[0]]
-        return splev(x, [self.knots, coefs, self.order])
+        self.knots, _c, _k = splrep(self.xknots, np.ones(self.nknots), k=self.order)
 
     def guess(self, data, x, **kwargs):
         """Estimate initial model parameter values from data."""
@@ -1476,7 +1490,7 @@ class DoniachModel(Model):
 
         f(x; A, \mu, \sigma, \gamma) = \frac{A}{\sigma^{1-\gamma}}
         \frac{\cos\bigl[\pi\gamma/2 + (1-\gamma)
-        \arctan{((x - \mu)}/\sigma)\bigr]} {\bigr[1 + (x-\mu)/\sigma\bigl]^{(1-\gamma)/2}}
+        \arctan{((x - \mu)/\sigma)}\bigr]} {\bigl[1 + {((x-\mu)/\sigma)}^2\bigr]^{(1-\gamma)/2}}
 
     For more information, see:
     https://www.casaxps.com/help_manual/line_shapes.htm
@@ -1587,8 +1601,9 @@ class StepModel(Model):
       https://en.wikipedia.org/wiki/Logistic_function)
 
     The step function starts with a value 0 and ends with a value of
-    :math:`A` rising to :math:`A/2` at :math:`\mu`, with :math:`\sigma`
-    setting the characteristic width. The functional forms are defined as:
+    :math:`\tt{sign}(\sigma)A` rising or falling to :math:`A/2` at :math:`\mu`,
+    with :math:`\sigma` setting the characteristic width of the step.
+    The functional forms are defined as:
 
     .. math::
         :nowrap:
@@ -1602,6 +1617,8 @@ class StepModel(Model):
 
     where :math:`\alpha = (x - \mu)/{\sigma}`.
 
+    Note that :math:`\sigma > 0` gives a rising step, while :math:`\sigma < 0` gives
+    a falling step.
     """
 
     valid_forms = ('linear', 'atan', 'arctan', 'erf', 'logistic')
@@ -1618,7 +1635,11 @@ class StepModel(Model):
         xmin, xmax = min(x), max(x)
         pars = self.make_params(amplitude=(ymax-ymin),
                                 center=(xmax+xmin)/2.0)
-        pars[f'{self.prefix}sigma'].set(value=(xmax-xmin)/7.0, min=0.0)
+        n = len(data)
+        sigma = 0.1*(xmax - xmin)
+        if data[:n//5].mean() > data[-n//5:].mean():
+            sigma = -sigma
+        pars[f'{self.prefix}sigma'].set(value=sigma)
         return update_param_vals(pars, self.prefix, **kwargs)
 
     __init__.__doc__ = COMMON_INIT_DOC
@@ -1662,6 +1683,8 @@ class RectangleModel(Model):
     where :math:`\alpha_1 = (x - \mu_1)/{\sigma_1}` and
     :math:`\alpha_2 = -(x - \mu_2)/{\sigma_2}`.
 
+    Note that, unlike a StepModel, :math:`\sigma_1 > 0` is enforced, giving a
+    rising initial step, and  :math:`\sigma_2 > 0` gives a falling final step.
     """
 
     valid_forms = ('linear', 'atan', 'arctan', 'erf', 'logistic')
@@ -1686,9 +1709,10 @@ class RectangleModel(Model):
         xmin, xmax = min(x), max(x)
         pars = self.make_params(amplitude=(ymax-ymin),
                                 center1=(xmax+xmin)/4.0,
-                                center2=3*(xmax+xmin)/4.0)
-        pars[f'{self.prefix}sigma1'].set(value=(xmax-xmin)/7.0, min=0.0)
-        pars[f'{self.prefix}sigma2'].set(value=(xmax-xmin)/7.0, min=0.0)
+                                center2=3*(xmax+xmin)/4.0,
+                                sigma1={'value': (xmax-xmin)/10.0, 'min': 0},
+                                sigma2={'value': (xmax-xmin)/10.0, 'min': 0})
+
         return update_param_vals(pars, self.prefix, **kwargs)
 
     __init__.__doc__ = COMMON_INIT_DOC
