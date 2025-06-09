@@ -8,6 +8,7 @@ This example illustrates how to handle two-dimensional data with lmfit.
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.interpolate import griddata
+from scipy.ndimage import rotate
 
 import lmfit
 from lmfit.lineshapes import gaussian2d, lorentzian
@@ -46,32 +47,75 @@ lmfit.report_fit(result)
 ###############################################################################
 # To check the fit, we can evaluate the function on the same grid we used
 # before and make plots of the data, the fit and the difference between the two.
-fig, axs = plt.subplots(2, 2, figsize=(10, 10))
+def plot_comparison(X, Y, Z, fit):
+    fig, axs = plt.subplots(2, 2, figsize=(10, 10))
 
-vmax = np.nanpercentile(Z, 99.9)
+    vmax = np.nanpercentile(Z, 99.9)
 
-ax = axs[0, 0]
-art = ax.pcolor(X, Y, Z, vmin=0, vmax=vmax, shading='auto')
+    ax = axs[0, 0]
+    art = ax.pcolor(X, Y, Z, vmin=0, vmax=vmax, shading='auto')
+    plt.colorbar(art, ax=ax, label='z')
+    ax.set_title('Data')
+
+    ax = axs[0, 1]
+    art = ax.pcolor(X, Y, fit, vmin=0, vmax=vmax, shading='auto')
+    plt.colorbar(art, ax=ax, label='z')
+    ax.set_title('Fit')
+
+    ax = axs[1, 0]
+    fit = model.func(X, Y, **result.best_values)
+    art = ax.pcolor(X, Y, Z-fit, vmin=0, vmax=10, shading='auto')
+    plt.colorbar(art, ax=ax, label='z')
+    ax.set_title('Data - Fit')
+
+    for ax in axs.ravel():
+        ax.set_xlabel('x')
+        ax.set_ylabel('y')
+    axs[1, 1].remove()
+    plt.show()
+plot_comparison(X, Y, Z, model.func(X, Y, **result.best_values))
+
+
+###############################################################################
+# Now we make it more complicated by rotating the Gaussian.
+###############################################################################
+theta = 30
+Z_rotated = rotate(Z, theta)
+x_cut, y_cut = np.array(Z_rotated.shape)-np.array(Z.shape)
+Z_rotated = Z_rotated[int(np.floor(x_cut/2)):-int(np.ceil(x_cut/2)), int(np.floor(y_cut/2)):-int(np.ceil(y_cut/2))]
+z_rotated = griddata((X.flatten(), Y.flatten()), Z_rotated.flatten(), (x, y), method='linear', fill_value=0)
+
+fig, ax = plt.subplots()
+art = ax.pcolor(X, Y, Z_rotated, shading='auto')
 plt.colorbar(art, ax=ax, label='z')
-ax.set_title('Data')
-
-ax = axs[0, 1]
-fit = model.func(X, Y, **result.best_values)
-art = ax.pcolor(X, Y, fit, vmin=0, vmax=vmax, shading='auto')
-plt.colorbar(art, ax=ax, label='z')
-ax.set_title('Fit')
-
-ax = axs[1, 0]
-fit = model.func(X, Y, **result.best_values)
-art = ax.pcolor(X, Y, Z-fit, vmin=0, vmax=10, shading='auto')
-plt.colorbar(art, ax=ax, label='z')
-ax.set_title('Data - Fit')
-
-for ax in axs.ravel():
-    ax.set_xlabel('x')
-    ax.set_ylabel('y')
-axs[1, 1].remove()
+ax.set_xlabel('x')
+ax.set_ylabel('y')
 plt.show()
+
+
+###############################################################################
+# If we try the fit again, it now obviously fails
+model = lmfit.models.Gaussian2dModel()
+
+params = model.guess(z_rotated, x, y)
+result = model.fit(z_rotated, x=x, y=y, params=params, weights=1/error)
+lmfit.report_fit(result)
+###############################################################################
+plot_comparison(X, Y, Z_rotated, model.func(X, Y, **result.best_values))
+
+
+###############################################################################
+# This is where we can use the 2D Gaussian with an included rotation.
+# It is a more general model, that works with both datasets due to the
+# increased degrees of freedom.
+model = lmfit.models.Gaussian2dWithAngleModel()
+params = model.guess(z_rotated, x, y)
+result = model.fit(z_rotated, x=x, y=y, params=params, weights=1/error)
+print("Expected theta:", theta/180 * np.pi)
+lmfit.report_fit(result)
+###############################################################################
+# Now the comparison matches again.
+plot_comparison(X, Y, Z_rotated, model.func(X, Y, **result.best_values))
 
 
 ###############################################################################

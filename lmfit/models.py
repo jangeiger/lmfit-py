@@ -645,7 +645,7 @@ class Gaussian2dWithAngleModel(Model):
     .. math::
 
         a = (\cos(theta)^2/(2 \sigma_x^2) + \sin(theta)^2/(2 \sigma_y^2))
-        b = (\sin(2 theta)/(2 \sigma_x^2) - \sin(2 theta)/(2 \sigma_y^2))
+        b = (\sin(2 theta)/(4 \sigma_x^2) - \sin(2 theta)/(4 \sigma_y^2))
         c = (\sin(theta)^2/(2 \sigma_x^2) + \cos(theta)^2/(2 \sigma_y^2))
 
     """
@@ -674,6 +674,8 @@ class Gaussian2dWithAngleModel(Model):
     def guess(self, data, x, y, negative=False, **kwargs):
         """Estimate initial model parameter values from data."""
         pars = guess_from_peak2d(self, data, x, y, negative)
+        # add limits to angle
+        pars["theta"].set(min=-np.pi/4, max=np.pi/4)
         return update_param_vals(pars, self.prefix, **kwargs)
 
     __init__.__doc__ = COMMON_INIT_DOC.replace("['x']", "['x', 'y']")

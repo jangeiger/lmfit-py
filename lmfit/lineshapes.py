@@ -70,23 +70,23 @@ def gaussian2d(x, y=0.0, amplitude=1.0, centerx=0.0, centery=0.0, sigmax=1.0,
 
 def gaussian2dWithAngle(x, y=0.0, amplitude=1.0, centerx=0.0, centery=0.0, sigmax=1.0,
                sigmay=1.0, theta=0.0):
-    """Return a 2-dimensional Gaussian function including an angle.
+    """Return a 2-dimensional Gaussian function including an angle for rotation.
 
     gaussian2d(x, y, amplitude, centerx, centery, sigmax, sigmay) =
-        amplitude * exp(-a*(x-centerx)**2 - b*(x-centerx)*(y-centery)
+        amplitude * exp(-a*(x-centerx)**2 - 2*b*(x-centerx)*(y-centery)
                                           - c*(y-centery)**2)
 
     with the definitions
     a = (cos(theta)**2/(2 * sigmax**2) + sin(theta)**2/(2 * sigmay**2))
-    b = (sin(2 *theta)/(2 * sigmax**2) - sin(2 *theta)/(2 * sigmay**2))
+    b = (sin(2 *theta)/(4 * sigmax**2) - sin(2 *theta)/(4 * sigmay**2))
     c = (sin(theta)**2/(2 * sigmax**2) + cos(theta)**2/(2 * sigmay**2))
 
     """
     a = (cos(theta)**2/(2 * sigmax**2) + sin(theta)**2/(2 * sigmay**2))
-    b = (sin(2 *theta)/(2 * sigmax**2) - sin(2 *theta)/(2 * sigmay**2))
+    b = (sin(2 *theta)/(4 * sigmax**2) - sin(2 *theta)/(4 * sigmay**2))
     c = (sin(theta)**2/(2 * sigmax**2) + cos(theta)**2/(2 * sigmay**2))
 
-    z = amplitude*exp(-a*(x-centerx)**2-b*(x-centerx)*(y-centery)-c*(y-centery)**2)
+    z = amplitude*exp(-a*(x-centerx)**2-2*b*(x-centerx)*(y-centery)-c*(y-centery)**2)
     return z
 
 
